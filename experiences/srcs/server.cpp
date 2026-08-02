@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/02 17:37:43 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/02 17:48:16 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -142,18 +142,34 @@ void	Server::receiveData(epoll_event event)
 	{
 		write(STDOUT_FILENO, bf, ct);
 		buff.append(bf, ct);
-		send(cli_fd, "from server:\n", 14, MSG_NOSIGNAL); // echo back text
-		size_t s = send(cli_fd, buff.c_str(), buff.size(), MSG_NOSIGNAL);
-		if (s == 0)
+		// send(cli_fd, "from server:\n", 14, MSG_NOSIGNAL); // echo back text
+		for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
+		{
+			send(clients.at(x).getFd(), "from server:\n", 14, MSG_NOSIGNAL); // echo back text
+			size_t s = send(clients.at(x).getFd(), buff.c_str(), buff.size(), MSG_NOSIGNAL);
+				if (s == 0)
 		{
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
-			continue ;
+				continue ;
 			else
 			{
 				close(cli_fd);
 				return ;
 			}
 		}
+		} // closing remaining clients sockets
+			// size_t s = send(cli_fd, buff.c_str(), buff.size(), MSG_NOSIGNAL);
+		
+		// if (s == 0)
+		// {
+		// 	if (errno == EAGAIN || errno == EWOULDBLOCK)
+		// 		continue ;
+		// 	else
+		// 	{
+		// 		close(cli_fd);
+		// 		return ;
+		// 	}
+		// }
 	}
 	if (ct == 0)
 	{

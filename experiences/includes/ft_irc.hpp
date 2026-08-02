@@ -6,22 +6,28 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/07/20 21:30:22 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/02 15:22:59 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #pragma once
 
 #include <iostream>
-#include <unistd.h>
 #include <vector>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <fcntl.h>
 #include <csignal>
+#include <cstring>
+#include <cerrno>
+#include <cstdlib>
+#include <csignal>
+
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/epoll.h>
+#include <sys/types.h>
 
 #define RESET   "\033[0m"
 #define BLACK   "\033[30m"      /* Black */
@@ -41,6 +47,10 @@
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
+#define PORT 8080
+#define IP_ADDR "127.0.0.1"
+#define MAX_EVENT 10
+
 class Client
 {
 	private:
@@ -52,24 +62,40 @@ class Client
 		Client(int fd, std::string ipaddr);
 		~Client();
 		
-		int		getFd();
-		void	setFd(int fd);
-		void	setIp(std::string s);
+		int			getFd();
+		void		setFd(int fd);
+		void		setIp(std::string s);
+		std::string	getIp();
 };
 
 class Server
 {
 	private:
 		unsigned int				Port;
-		int							SocketId;
+		int							SocketFd;
 		int							epollFd;
-		static bool 				signal;
+		bool 							signal;
+		struct sockaddr_in			address;
 		std::vector <Client> 		clients;
 		std::vector<epoll_event> 	ev;
 		unsigned int				maxEv;
 	public:
 		Server();
 		Server(const Server &server);
-		Server(unsigned int port, int Socket_id, unsigned int max_ev);
-		
+		Server(int port, std::string password);
+		~Server();
+		// Server(unsigned int port, int Socket_id, unsigned int max_ev);
+		int 	Setup_server();
+		void	set_sock_non_blocking(int fd);
+
+		void	ListeningLoop();
+		void	epoll_init();
+		void	AddNewClient(epoll_event event);
+
+		void	signalInit();
+		static void	signalHandler(int signum);
+		void	AddClientToStruct(struct sockaddr_in cli, int cli_fd);
+		void	Clean_exit();
+		void	receiveData(epoll_event event);
+		std::string		getIpFromFd(int cli_fd);
 };

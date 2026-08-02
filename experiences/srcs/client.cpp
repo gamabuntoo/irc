@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:08 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/07/20 16:31:37 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/02 13:25:07 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,4 +53,9 @@ void	Client::setIp(std::string s)
 	if (s == "" /*|| invalidIpFormat(s) */)
 		std::cerr << MAGENTA <<"Client warning: setIp(): be careful, empty or invalid ip set" << RESET << std::endl;
 	this->ip_addr = s;
+}
+
+std::string	Client::getIp()
+{
+	return (this->ip_addr);
 }

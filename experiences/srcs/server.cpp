@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/02 17:48:16 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/05 01:40:19 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,7 +64,7 @@ void	Server::set_sock_non_blocking(int fd)
 {
 	int x = -1;
 	int w = -1;
-	w = fcntl(fd, F_GETFL);
+	w = fcntl(fd, F_GETFL); // get status of file descriptor 
 	if (w < 0)
 		throw std::runtime_error("set_sock_non_blocking, fcntl 1rst call error with fd");
 	x = fcntl(fd, F_SETFL, w | O_NONBLOCK);
@@ -115,7 +115,7 @@ void	Server::AddNewClient(epoll_event event)
 		if (epoll_ctl(epollFd, EPOLL_CTL_ADD, cli_fd, &event) == -1)
 			throw std::runtime_error("Error: Server::AddNewClient; Epoll_ctl error"), close(cli_fd);
 		AddClientToStruct(cli_addr, cli_fd);
-		std::cout << GREEN << "client paquet received from:" << clients.back().getIp() 
+		std::cout << GREEN << "new client connected at:" << clients.back().getIp() 
 		<< " and from fd: " << clients.back().getFd() << RESET << "\n" << std::endl;
 	}
 }
@@ -130,60 +130,181 @@ std::string		Server::getIpFromFd(int cli_fd)
 	return ("0.0.0.0 ip error ");
 }
 
-void	Server::receiveData(epoll_event event)
+
+		// // send(cli_fd, "from server:\n", 14, MSG_NOSIGNAL); // echo back text
+		// for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
+		// {
+		// 	std::cout << this->clients.size() << " " << x << std::endl;
+			
+		// 	std::string st("from server: ");
+		// 	st.append("from ip: ");
+		// 	st.append(getIpFromFd(clients.at(x).getFd()));
+		// 	st.append(" : "); st.append(buff); // COUILLE COTE SERVEUR SUR LA STRING
+		// 	std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
+		// 	size_t s = send(clients.at(x).getFd(), st.c_str(), sizeof(char) * st.size()+1, MSG_NOSIGNAL); // echo back text
+		// 	// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
+		// 	if (s == 0)
+		// 	{
+		// 		if (errno == EAGAIN || errno == EWOULDBLOCK)			// BLOCK TO SEND TO CLIENTS BUT SUSPICIOUS 
+		// 			break;
+		// 		else
+		// 		{
+		// 			close(cli_fd);
+		// 			return ;
+		// 		}
+		// 	}
+		// 	// st =  "";
+		// } // closing remaining clients sockets
+
+void	Server::forwardData(epoll_event event, std::string buffer)
 {
-	char bf[1024];
-	ssize_t ct = -1;
-	int cli_fd = event.data.fd;
-	memset(bf, 1024, sizeof(bf));
-	std::cout << GREEN << "From: " << MAGENTA << "FD n°" << cli_fd << RESET << " "<< getIpFromFd(cli_fd) << "\n\t" << std::endl;
 	std::string buff;
-	while ((ct = recv(cli_fd, bf, sizeof(bf), 0)) > 0)
+	int cli_fd = event.data.fd;
+
+	for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
 	{
-		write(STDOUT_FILENO, bf, ct);
-		buff.append(bf, ct);
-		// send(cli_fd, "from server:\n", 14, MSG_NOSIGNAL); // echo back text
-		for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
+		std::cout << "size = " << this->clients.size() << " index= " << x << std::endl;
+		if (cli_fd != clients.at(x).getFd())
 		{
-			send(clients.at(x).getFd(), "from server:\n", 14, MSG_NOSIGNAL); // echo back text
-			size_t s = send(clients.at(x).getFd(), buff.c_str(), buff.size(), MSG_NOSIGNAL);
-				if (s == 0)
+			
+			std::string st;
+			st.append("from server: ");
+			st.append("from ip: ");
+			st.append(getIpFromFd(clients.at(x).getFd()));
+			st.append(" : "); st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
+			// std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
+			size_t s = send(clients.at(x).getFd(), st.c_str(), sizeof(char) * st.size()+1, MSG_NOSIGNAL); // echo back text
+			// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
+			if (s == 0)
+			{
+				if (errno == EAGAIN || errno == EWOULDBLOCK)
+					break;
+				else
+				{
+					close(cli_fd);
+					return ;
+				}
+			}
+		}
+		// st =  "";
+	}
+}
+
+void	Server::sendMessage(int fd, std::string buffer)
+{
+	std::string buff;
+	int cli_fd = fd;
+
+	if (cli_fd == clients.at(getClientIdFromFd(fd)).getFd())
+	{
+		std::string st;
+		// st.append(GREEN);
+		st.append("from server: "); 
+		st.append(getIpFromFd(clients.at(getClientIdFromFd(fd)).getFd()));
+		st.append(" : ");
+		// st.append(RESET);
+		st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
+		st.append("\n");
+		// std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
+		size_t s = send(fd, st.c_str(), sizeof(char) * st.size()+1, MSG_NOSIGNAL); // echo back text
+		// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
+		if (s == 0)
 		{
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				continue ;
+				return ;
 			else
 			{
 				close(cli_fd);
 				return ;
 			}
 		}
-		} // closing remaining clients sockets
-			// size_t s = send(cli_fd, buff.c_str(), buff.size(), MSG_NOSIGNAL);
-		
-		// if (s == 0)
-		// {
-		// 	if (errno == EAGAIN || errno == EWOULDBLOCK)
-		// 		continue ;
-		// 	else
-		// 	{
-		// 		close(cli_fd);
-		// 		return ;
-		// 	}
-		// }
 	}
-	if (ct == 0)
+}
+
+void	Server::deleteUser(int cli_fd)
+{
+	for (long unsigned int x = 0; x < clients.size(); x++)
 	{
-		std::cout << RED << "client disconnected" << RESET <<  std::endl;
-		close(cli_fd);
+		if (clients.at(x).getFd() == cli_fd)
+		{
+			clients.erase(clients.begin() + x);
+			return ;
+		}
 	}
-	else if (ct == -1) 
+}
+
+std::string	Server::receiveData(epoll_event event)
+{
+	char bf[1024];
+	ssize_t ct = -1;
+	std::string buff;
+	int cli_fd = event.data.fd;
+	memset(bf, 1024, sizeof(bf));
+	while ((ct = recv(cli_fd, bf, sizeof(bf), 0)) > 0)
+	{
+		if (ct > 0)
+		{
+			buff.append(bf, ct);
+			bf[ct+1] = '\0';
+		}
+	}
+	if (ct)
+	{
+		std::cout << MAGENTA << "\nFD n°" << cli_fd << YELLOW << " "<< getIpFromFd(cli_fd) << RESET << ": " << buff << std::endl;
+		return (bf);
+	}
+	else if (ct == 0)
+	{
+		std::cout << RED << "client from fd n°" << cli_fd << " disconnected" << RESET <<  std::endl;
+		close(cli_fd);
+		deleteUser(cli_fd);
+	}
+	else if (ct == -1)
 	{
 		if (errno != EAGAIN) 
 		{
 			throw std::runtime_error("Error: ListeningLoop; recv err");
 			close(cli_fd);
+			deleteUser(cli_fd);
 		}
 	}
+	if (buff == "\n")
+		return ("newline");
+	return ("empty");
+}
+
+int		Server::getClientIdFromFd(int fd)
+{
+	for (long unsigned int x = 0; x < clients.size(); x++)
+	{
+		if (clients.at(x).getFd() == fd)
+		{
+			return (x);
+		}
+	}
+	return (0);
+}
+
+int	Server::check_connection(std::string buffer, int fd)
+{
+	// static int is_ok = 3;
+	// int size = std::strlen("PASS") + passwd.size();
+	std::string fullstc("PASS " + passwd);
+	buffer.replace(buffer.end()-2, buffer.end(), "\0");
+	std::cout << fullstc << " <- requested , given -> " << buffer << std::endl;
+	if (buffer.compare(fullstc) == 0)
+	{
+		std::cout << GREEN << "User n°" << fd << " well logged!" << std::endl;
+		sendMessage(fd, "good password: Connection accepted");
+		clients[getClientIdFromFd(fd)].setLogged();
+	}
+	else 
+	{
+		std::cout << "Error Password from client " << fd << std::endl;
+		sendMessage(fd, "log error, please retry with another password");
+		return (-1);
+	}
+	return (0);
 }
 
 void	Server::ListeningLoop()
@@ -211,7 +332,20 @@ void	Server::ListeningLoop()
 			if (event[x].data.fd == SocketFd)
 				AddNewClient(event[x]);
 			else
-				receiveData(event[x]);
+			{
+				std::string buffer;
+				buffer = receiveData(event[x]);
+//test
+				if (check_connection(buffer, event[x].data.fd) == -1)
+				{
+					std::cout << "Client " << event[x].data.fd << " disconnected" << std::endl;
+					close(event[x].data.fd);
+					deleteUser(event[x].data.fd);
+					break;
+				}
+//test				
+				forwardData(event[x], buffer);
+			}
 		}
 	}
 	std::cout << RED << "shutting down server" << RESET << std::endl;
@@ -248,6 +382,7 @@ Server::Server(int port, std::string password)
 	epollFd = -1;
 	maxEv = MAX_EVENT;
 	(void)password; //temporaire
+	passwd = password;
 	ev = std::vector<epoll_event>(maxEv);
 	Port = port;
 	if (port < 0)

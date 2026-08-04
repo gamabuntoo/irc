@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:11 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/02 17:37:48 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/05 01:20:18 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,9 +21,10 @@ int main(int argc, char **argv)
 	int x = 0;
 	std::stringstream s(argv[1]);
 	s >> x;
+	std::string passwd(argv[2]);
 	try
 	{
-		Server s(x, "passwd");
+		Server s(x, passwd);
 		
 	}
 	catch(const std::exception& e)

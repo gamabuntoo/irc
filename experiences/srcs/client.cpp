@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:08 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/02 17:37:46 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/05 01:10:47 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,4 +58,9 @@ void	Client::setIp(std::string s)
 std::string	Client::getIp()
 {
 	return (this->ip_addr);
+}
+
+void		Client::setLogged()
+{
+	logged = 1;
 }

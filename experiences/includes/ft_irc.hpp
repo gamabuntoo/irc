@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/05 01:17:13 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/21 01:57:37 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <csignal>
+#include <sstream>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -62,8 +63,10 @@ class Client
 {
 	private:
 		int Fd;
-		std::string ip_addr;
 		bool		logged;
+		std::string ip_addr;
+		std::string nick;
+		std::string user;
 	public:
 		Client();
 		Client(const Client &src);
@@ -73,8 +76,12 @@ class Client
 		int			getFd();
 		void		setFd(int fd);
 		void		setIp(std::string s);
-		std::string	getIp();
+		void		setIdentity(std::string nick, std::string user);
+		std::string			getIp();
+		std::string 		getNick();
+		std::string			getUser();
 		void		setLogged();
+		bool		getLoggedStatus();
 };
 
 class Server
@@ -96,21 +103,32 @@ class Server
 		~Server();
 		// Server(unsigned int port, int Socket_id, unsigned int max_ev);
 		int 			Setup_server();
+
 		void			set_sock_non_blocking(int fd);
 
 		void			ListeningLoop();
 		void			epoll_init();
-		void			AddNewClient(epoll_event event);
 
 		void			signalInit();
 		static void		signalHandler(int signum);
+
+
 		void			AddClientToStruct(struct sockaddr_in cli, int cli_fd);
-		void			Clean_exit();
 		std::string		receiveData(epoll_event event);
-		std::string		getIpFromFd(int cli_fd);
-		void			deleteUser(int cli_fd);
+		
 		void			forwardData(epoll_event event, std::string buffer);
 		void			sendMessage(int fd, std::string buffer);
+		void			sendNeutralMessage(int fd, std::string buffer);
+		
 		int				check_connection(std::string buffer, int fd);
+		void			AddNewClient(epoll_event event);
+		void			setClientStatusId(std::stringstream &s, int fd);
+		int				checkClientStatus(int fd, std::string buffer);
+		void			deleteUser(int cli_fd);
+
 		int				getClientIdFromFd(int fd);
+		std::string		getIpFromFd(int cli_fd);
+
+		void			Clean_exit();
+
 };

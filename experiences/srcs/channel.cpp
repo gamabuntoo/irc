@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/25 20:31:49 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 05:11:12 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/26 20:29:48 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -120,6 +120,11 @@ void		Channel::removeUser(std::string nick)
 {
 	long int i = 0;
 	i = isUserPresent(nick);
+	for (long unsigned int x = 0; x < operators.size(); x++)
+	{
+		if (nick == operators[x])
+			operators[x].erase();
+	}
 	if (i >= 0)
 		nicks.erase(nicks.begin() + i);
 	std::cout << RED << "User :" << WHITE << nick << RED << "disconnected from #" << RESET << name << "| users connected right now: " << nicks.size() << std::endl;
@@ -146,4 +151,18 @@ std::string	Channel::getTopic()
 bool		Channel::isOpOnly()
 {
 	return (this->topic_only_op_f);
+}
+
+void	Channel::addChanOperator(std::string nick)
+{
+	if (isOperator(nick) == true)
+	{
+		std::cout << RED << " Error can't add " << nick << " to operators: already set" << RESET << std::endl;
+		return ;
+	}
+	else
+	{
+		operators.push_back(nick);
+		std::cout << "User " << nick << " set as operator" << std::endl;
+	}
 }

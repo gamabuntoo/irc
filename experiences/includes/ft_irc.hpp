@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 05:10:05 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/26 20:12:47 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@
 #include <csignal>
 #include <sstream>
 #include <algorithm>
+#include <list>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -128,6 +129,7 @@ class Channel
 		int			isUserPresent(std::string nick);
 		bool		isOperator(std::string nick);
 		bool		isOpOnly();
+		void		addChanOperator(std::string nick);
 };
 
 class Server
@@ -166,6 +168,7 @@ class Server
 		void			forwardData(epoll_event event, std::string buffer);
 		void			sendMessage(int fd, std::string buffer);
 		void			sendNeutralMessage(int fd, std::string buffer);
+		void			sendMessage(int fd, std::string buffer, std::string prefix);
 
 		void			processCommand(int fd, std::string buffer);
 		int				nickCommand(Client &cli, std::string buffer);
@@ -175,10 +178,13 @@ class Server
 		void			joinCommand(Client &cli , std::string channel);
 		void			sendJoinInfo(Client &cli, std::string channel, int i);
 		void			topicCommand(Client &cli, std::string channel);
+		void			privmsgCommand(Client &cli, std::list<std::string> l);
 		
 		int				check_connection(std::string buffer, int fd);
 		void			AddNewClient(epoll_event event);
 		int				clientPassword(std::stringstream &s, int fd);
+		std::string 	getClientFormattedName(Client &cli);
+
 		void			setClientStatusId(std::stringstream &s, int fd);
 		int				checkClientStatus(int fd, std::string buffer);
 		void			capRequests(int fd, std::string buffer);

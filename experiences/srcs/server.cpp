@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 05:13:36 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/26 23:18:38 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -194,6 +194,12 @@ void	Server::forwardData(epoll_event event, std::string buffer)
 	}
 }
 
+std::string Server::getClientFormattedName(Client &cli)
+{
+	std::string st = ":" + cli.getNick() + "!" + cli.getUser() + "@" + cli.getIp() + " ";
+	return (st);
+}
+
 void	Server::sendMessage(int fd, std::string buffer) // for forwarding to multiple clients after log etc
 {
 	std::string buff;
@@ -201,7 +207,32 @@ void	Server::sendMessage(int fd, std::string buffer) // for forwarding to multip
 
 	if (cli_fd == clients.at(getClientIdFromFd(fd)).getFd())
 	{
-		std::string st = ":" + clients[getClientIdFromFd(fd)].getNick() + "!" + clients[getClientIdFromFd(fd)].getUser() + "@" + clients[getClientIdFromFd(fd)].getIp() + " ";
+		std::string st = getClientFormattedName(clients[getClientIdFromFd(fd)]);
+		st.append(buffer);
+		std::cout << BLUE << "To client:\n" << RESET << st << "\n" << std::endl;
+		size_t s = send(fd, st.c_str(), st.size(), MSG_NOSIGNAL); // echo back text
+		if (s == 0)
+		{
+			std::cout << RED << "Error while sending message\n" << RESET << std::endl;
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				return ;
+			else
+			{
+				close(cli_fd);
+				return ;
+			}
+		}
+	}
+}
+
+void	Server::sendMessage(int fd, std::string buffer, std::string prefix) // for forwarding to multiple clients after log etc
+{
+	std::string buff;
+	int cli_fd = fd;
+
+	if (cli_fd == clients.at(getClientIdFromFd(fd)).getFd())
+	{
+		std::string st = prefix;
 		st.append(buffer);
 		std::cout << BLUE << "To client:\n" << RESET << st << "\n" << std::endl;
 		size_t s = send(fd, st.c_str(), st.size(), MSG_NOSIGNAL); // echo back text
@@ -456,6 +487,7 @@ int		Server::nickCommand(Client &cli, std::string buffer)
 	sendMessage(cli.getFd(), rps);
 	cli.setIdentity(line, "", 1);
 	cli.printClientInfo();
+	//check for namechanges in channels
 	return (0);
 }
 
@@ -512,16 +544,15 @@ void	Server::sendJoinInfo(Client &cli, std::string channel, int i)
 		if (channels[i].isUserPresent(clients[x].getNick()) >= 0)
 		{
 			if (channels[i].isOperator(clients[x].getNick()) == true)
-			{
-				str.append("@");
-				str.append(clients[x].getNick());
-				str.append(" ");
-			}
+				str.append("@" + clients[x].getNick() + " ");
+			else
+				str.append("+" + clients[x].getNick() + " ");
 		}
 	}
 	if (str[str.size()-1] == ' ')
 		str.insert(str.size()-1, "\r\n");
 	sendNeutralMessage(cli.getFd(), str);
+	sendNeutralMessage(cli.getFd(), "366 " + cli.getNick() + " #" + channel + " :End of /NAMES list\r\n");
 }
 
 void	Server::joinCommand(Client &cli , std::string channel)
@@ -533,27 +564,7 @@ void	Server::joinCommand(Client &cli , std::string channel)
 		if (channel == channels[i].getName())
 		{
 			if (channels[i].addUser(cli.getNick()) == 1)
-			{
-				sendJoinInfo(cli, channel, i);
-				// sendMessage(cli.getFd(), "JOIN :#" + channel + "\r\n");
-				// sendNeutralMessage(cli.getFd(), "324 " + cli.getNick() + " #" + channel + " " + "+nt\r\n");
-				// sendNeutralMessage(cli.getFd(), "332 " + cli.getNick() + " #" + channel + " :" + channels[i].getTopic() + "\r\n");
-				// std::string str = "353 " + cli.getNick() + " = #" + channel + " :";
-				// for (long unsigned int x = 0; x < clients.size();  x++)
-				// {
-				// 	if (channels[i].isUserPresent(clients[x].getNick()) >= 0)
-				// 	{
-				// 		if (channels[i].isOperator(clients[x].getNick()) == true)
-				// 			str.append("@");
-				// 		str.append(clients[x].getNick());
-				// 		str.append(" ");
-				// 	}
-				// }
-				// if (str[str.size()-1] == ' ')
-				// 	str.insert(str.size()-1, "\r\n");
-				// sendNeutralMessage(cli.getFd(), str);
-				return ;
-			}
+				return sendJoinInfo(cli, channel, i);
 			else
 			{
 				// send message to client to inform that name already exists
@@ -587,11 +598,8 @@ void	Server::topicCommand(Client &cli, std::string channel)
 		if (channels[i].getName() == aaa && (channels[i].isOperator(cli.getNick()) == true && channels[i].isOpOnly())) // op protextion
 		{
 			std::string s = channel.substr(channel.find(" :")+2);
-			std::cout << "TROPICO " << s << std::endl;
 			s.append("\r\n");
 			channels[i].setTopic(s);
-			// std::string reply = "332 " + cli.getNick();
-			// reply.append(i.base()->getName()); reply.append(" :"); reply.append(s);
 			std::string reply = "TOPIC #" + channels[i].getName() + " :" + s;
 			// sendMessage(cli.getFd(), reply);
 			for (long unsigned int x = 0; x < clients.size();  x++)
@@ -600,10 +608,35 @@ void	Server::topicCommand(Client &cli, std::string channel)
 					sendMessage(clients[x].getFd(), reply);
 			}
 		}
+		else if ((aaa == channels[i].getName() && channels[i].getName().find(":") == std::string::npos))
+		{
+			std::string rpl = "332 " + cli.getNick() + " #";
+			rpl.append(channels[i].getName() + " :" + channels[i].getTopic() + "\r\n");
+			sendMessage(cli.getFd(), rpl);
+		}
 	}
 
 }
 
+void	Server::privmsgCommand(Client &cli, std::list<std::string> l)
+{	
+	std::cout << "privmsg 1 -\n" << l.front() << "|\n" << l.back() << std::endl;
+	for (long unsigned int i = 0; i < channels.size(); i++)
+	{
+		if (l.front() == channels[i].getName() && channels[i].isUserPresent(cli.getNick()) >= 0)
+		{
+			for (long unsigned int x = 0; x < clients.size(); x++)
+			{
+				std::cout << "privmsg 2 -" << l.front() << "|" << l.back() << std::endl;
+				std::cout << "privmsg 2 -" << l.front() << "|" << l.back() << std::endl;
+				if (channels[i].isUserPresent(clients[x].getNick()) >= 0 && clients[x].getNick() != cli.getNick())
+					sendMessage(clients[x].getFd(), "PRIVMSG #" + l.front() + " :" + l.back() + "\r\n", getClientFormattedName(cli));
+			}
+		}
+		// else
+		// { client non autorisé }
+	}
+}
 
 void	Server::processCommand(int fd, std::string buffer)
 {
@@ -644,8 +677,31 @@ void	Server::processCommand(int fd, std::string buffer)
 			tp.erase(tp.size()-2);
 			topicCommand(clients[getClientIdFromFd(fd)], tp);
 		}
+		else if (buffer.compare(0, 6, "QUIT :") == 0)	
+			deleteUser(fd);
+		else if (buffer.compare(0, 9, "PRIVMSG #") == 0)
+		{
+			std::cout << "privmsg" << std::endl;
+			std::list<std::string> l;
+			// l.assign(3, "");
+			std::string g = (buffer.substr(9, buffer.find(" :", 9)));
+			// g = g.substr(0, g.find(""))
+			l.push_back(g.substr(0, g.find(" :")));
+			l.push_back(buffer.substr(buffer.find(" :")+2));
+			l.back().erase(l.back().size()-2);
+			privmsgCommand(clients[getClientIdFromFd(fd)], l);
+			// m. = buffer.substr(9, buffer.find(" ", 9));
+		}
+		else if (buffer.compare(0, 6, "PART #") == 0)
+		{
+			std::cout << " part parsing "<< tmp << std::endl;
+			std::string chan = tmp.substr(0, tmp.find(" :")-1);
+			std::string rs = tmp.substr(chan.size());
+			std::cout << "part parsing "<< chan << " " << rs << std::endl;
+			// PARSING:			Part command parsing error
+			// partCommand(tmp);
+		}
 	}
-
 }
 
 void	Server::ListeningLoop()

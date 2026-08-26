@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/21 01:57:37 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/26 05:10:05 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <csignal>
 #include <sstream>
+#include <algorithm>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -48,14 +49,26 @@
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
-#define PORT 8080
-#define IP_ADDR "127.0.0.1"
-#define MAX_EVENT 10
+#define PORT 			8080
+#define MAX_EVENT		10
+#define IP_ADDR			"127.0.0.1"
+#define DEFAULT_USER	"3pmra5r8\"/\"-qr^$afùqldmw,roz0°3=rpa"
+#define DEFAULT_NICK	"/rp3\rarqlpzm08qa\"5$^3=\"aù-frdmow°,"
+#define SERVER_NAME		"serveur.irc.cool"
 
-// class User
+
+#define INVITE_ONLY		65
+#define TOPIC_OP_ONLY	66
+#define	CHANNEL_PASSWD	67
+#define USER_LIMIT		68
+#define EMPTY_CHAN_PASSW ""
+
+
+// class Parser
 // {
 // 	private:
-// 		std::string 
+			
+// 	public:
 	
 // };
 
@@ -72,16 +85,49 @@ class Client
 		Client(const Client &src);
 		Client(int fd, std::string ipaddr);
 		~Client();
-		
+
 		int			getFd();
 		void		setFd(int fd);
 		void		setIp(std::string s);
-		void		setIdentity(std::string nick, std::string user);
+		void		setIdentity(std::string nick, std::string user, int flag);
 		std::string			getIp();
 		std::string 		getNick();
 		std::string			getUser();
+		void				printClientInfo();
 		void		setLogged();
 		bool		getLoggedStatus();
+};
+
+class Channel
+{
+	private:
+		std::string					name;
+		std::vector<std::string> 	nicks;		// contains users nicknames
+		std::vector<std::string>	operators;	// contains op nick (server can't host the same nick 2 times)
+		std::vector<std::string>	invited; 	// stock nickname of invited user till he's connected (not done yet)
+		std::string					topic;
+		bool 				invite_only_f;
+		bool 				topic_only_op_f;
+		bool 				channel_password_f;
+		bool 				user_limit_f;
+		std::string 	channel_passwd;
+		unsigned int 	user_limit_s;
+
+	public:
+		Channel();
+		Channel(std::string name, Client &creator, std::string topic, int invite_only_f, int topic_only_op_f, int channel_password_f, int user_limit_f, std::string channel_passwd, unsigned int user_limit_s);
+		Channel(const 	Channel &src);
+		Channel &operator=(const Channel &src);
+		~Channel();
+		std::string			getName();
+		long unsigned int	getSize();
+		void				setTopic(std::string topic);
+		std::string				getTopic();
+		int			addUser(std::string nick);
+		void		removeUser(std::string nick);
+		int			isUserPresent(std::string nick);
+		bool		isOperator(std::string nick);
+		bool		isOpOnly();
 };
 
 class Server
@@ -93,6 +139,7 @@ class Server
 		bool 							signal;
 		struct sockaddr_in			address;
 		std::vector <Client> 		clients;
+		std::vector <Channel>		channels;
 		std::vector<epoll_event> 	ev;
 		unsigned int				maxEv;
 		std::string					passwd;
@@ -119,11 +166,22 @@ class Server
 		void			forwardData(epoll_event event, std::string buffer);
 		void			sendMessage(int fd, std::string buffer);
 		void			sendNeutralMessage(int fd, std::string buffer);
+
+		void			processCommand(int fd, std::string buffer);
+		int				nickCommand(Client &cli, std::string buffer);
+		void			pongCommand(Client &cli, std::string buffer);	
+		void			pongUserListRoutine(Client &cli);
+		void			pongChannelsListRoutine();
+		void			joinCommand(Client &cli , std::string channel);
+		void			sendJoinInfo(Client &cli, std::string channel, int i);
+		void			topicCommand(Client &cli, std::string channel);
 		
 		int				check_connection(std::string buffer, int fd);
 		void			AddNewClient(epoll_event event);
+		int				clientPassword(std::stringstream &s, int fd);
 		void			setClientStatusId(std::stringstream &s, int fd);
 		int				checkClientStatus(int fd, std::string buffer);
+		void			capRequests(int fd, std::string buffer);
 		void			deleteUser(int cli_fd);
 
 		int				getClientIdFromFd(int fd);

@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:08 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/21 00:57:29 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/25 20:23:05 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,7 @@ Client::Client(const Client &src)
 	this->ip_addr = src.ip_addr;
 	this->nick = src.nick;
 	this->user = src.user;
-	this->logged = 0;
+	this->logged = src.logged;
 }
 Client::Client(int fd, std::string ipaddr)
 {
@@ -32,8 +32,8 @@ Client::Client(int fd, std::string ipaddr)
 		throw std::runtime_error("\033[31mClient error: Constructor: values negative or invalid\033[0m");
 	this->Fd = fd;
 	this->ip_addr = ipaddr;
-	this->nick = "john";
-	this->user = "john doe";
+	this->nick = DEFAULT_NICK;
+	this->user = DEFAULT_USER;
 	this->logged = 0;
 }
 
@@ -68,18 +68,21 @@ std::string	Client::getIp()
 
 void		Client::setLogged()
 {
-	logged = 1;
+	this->logged = true;
 }
 
 bool		Client::getLoggedStatus()
 {
-	return(this->logged);
+	bool f = this->logged;
+	return (f);
 }
 
-void		Client::setIdentity(std::string nick, std::string user)
+void		Client::setIdentity(std::string nick, std::string user, int flag)
 {
-	this->nick = nick;
-	this->user = user;
+	if (flag >= 1)
+		this->nick = nick;
+	if (flag == 2)
+		this->user = user;
 }
 std::string		Client::getUser()
 {	
@@ -88,4 +91,19 @@ std::string		Client::getUser()
 std::string 		Client::getNick()
 {
 	return (this->nick);
+}
+
+void	Client::printClientInfo()
+{
+	if ((user.size() != std::string::npos) && (nick.size() != std::string::npos) && (ip_addr.size() != std::string::npos))
+		std::cout << YELLOW << "User: " << RESET << user << YELLOW << "\tNick: " << RESET << nick << YELLOW << "\tIp: " << RESET << ip_addr << "\n" << std::endl;
+	else
+	{
+		if (user.size() != std::string::npos)
+			std::cout << YELLOW << "User:\n" << RESET << user;
+		if (nick.size() != std::string::npos)
+			std::cout << YELLOW << "\nNick:\n" << RESET << nick;
+		if (ip_addr.size() != std::string::npos)
+			std::cout << YELLOW << "\nIp:\n" << RESET << ip_addr << "\n" << std::endl;
+	}
 }

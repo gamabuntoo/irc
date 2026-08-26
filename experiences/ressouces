@@ -6,3 +6,9 @@ EPOLL
 /quit
 /clear
 /rm + tab
+
+CHECK CONNECTIONS 
+les // contiennent la sécurité pour pas avoir 2x le meme user log 
+
+:server 353 nick = #channel :@operator +voice user1 user2
+:server 366 nick #channel :End of /NAMES list

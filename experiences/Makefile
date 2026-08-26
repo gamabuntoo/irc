@@ -4,7 +4,7 @@ CFLAGS = -std=c++98 -Wall -Wextra -Werror -g3
 INCLUDES_DIR= includes
 RM = rm -f
 SRCS_DIR = srcs
-SRCS = $(SRCS_DIR)/client.cpp $(SRCS_DIR)/server.cpp $(SRCS_DIR)/main.cpp
+SRCS = $(SRCS_DIR)/client.cpp $(SRCS_DIR)/server.cpp $(SRCS_DIR)/main.cpp $(SRCS_DIR)/channel.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(NAME)

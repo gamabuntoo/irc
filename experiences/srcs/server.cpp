@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/21 02:02:53 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/26 05:13:36 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,7 +50,7 @@ void	Server::Clean_exit()
 
 void Server::signalHandler(int signum)
 {
-	std::cout << "Signal received: " << signum <<", exiting..." << std::endl;
+	std::cout << GREEN << "\nSignal received: " << signum <<", exiting..." << RESET << std::endl;
 	// std::exit(0);
 	gsign_ = signum;
 }
@@ -194,26 +194,20 @@ void	Server::forwardData(epoll_event event, std::string buffer)
 	}
 }
 
-void	Server::sendMessage(int fd, std::string buffer)
+void	Server::sendMessage(int fd, std::string buffer) // for forwarding to multiple clients after log etc
 {
 	std::string buff;
 	int cli_fd = fd;
 
 	if (cli_fd == clients.at(getClientIdFromFd(fd)).getFd())
 	{
-		std::string st;
-		// st.append(GREEN);
-		st.append("from server: "); 
-		st.append(getIpFromFd(clients.at(getClientIdFromFd(fd)).getFd()));
-		st.append(" : ");
-		// st.append(RESET);
-		st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
-		// st.append("\n");
-		// std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
-		size_t s = send(fd, st.c_str(), sizeof(char) * st.size()+1, MSG_NOSIGNAL); // echo back text
-		// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
+		std::string st = ":" + clients[getClientIdFromFd(fd)].getNick() + "!" + clients[getClientIdFromFd(fd)].getUser() + "@" + clients[getClientIdFromFd(fd)].getIp() + " ";
+		st.append(buffer);
+		std::cout << BLUE << "To client:\n" << RESET << st << "\n" << std::endl;
+		size_t s = send(fd, st.c_str(), st.size(), MSG_NOSIGNAL); // echo back text
 		if (s == 0)
 		{
+			std::cout << RED << "Error while sending message\n" << RESET << std::endl;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				return ;
 			else
@@ -232,11 +226,14 @@ void	Server::sendNeutralMessage(int fd, std::string buffer)
 
 	if (cli_fd == clients.at(getClientIdFromFd(fd)).getFd())
 	{
-		std::string st;
+		std::string s_name(SERVER_NAME);
+		std::string st(":" + s_name + " ");
 		st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
-		size_t s = send(fd, st.c_str(), sizeof(char) * st.size()+1, MSG_NOSIGNAL); // echo back text
+		std::cout << BLUE << "To client:\n" << RESET << st << "\n" << std::endl;
+		size_t s = send(fd, st.c_str(), st.size(), MSG_NOSIGNAL); // echo back text
 		if (s == 0)
 		{
+			std::cout << RED << "Error while sending message\n" << RESET << std::endl;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				return ;
 			else
@@ -254,6 +251,17 @@ void	Server::deleteUser(int cli_fd)
 	{
 		if (clients.at(x).getFd() == cli_fd)
 		{
+			for (long unsigned int g = 0; g < channels.size(); g++)
+			{
+				if (channels[g].isUserPresent(clients[x].getNick()) >= 0)
+					channels[g].removeUser(clients[x].getNick());
+				if (channels[g].getSize() == 0)
+					channels.erase(channels.begin() + g);
+			}
+			close(cli_fd);
+			std::cout << RED << "Client: " << std::endl; 
+			clients.at(x).printClientInfo();
+			std::cout << RED << "disconnected" << RESET << std::endl;
 			clients.erase(clients.begin() + x);
 			return ;
 		}
@@ -278,12 +286,10 @@ std::string	Server::receiveData(epoll_event event)
 	if (ct)
 	{
 		std::cout << MAGENTA << "\nFD n°" << cli_fd << YELLOW << " "<< getIpFromFd(cli_fd) << RESET << ": \n" << buff << std::endl;
-		return (bf);
+		return (buff);
 	}
 	else if (ct == 0)
 	{
-		std::cout << RED << "client from fd n°" << cli_fd << " disconnected" << RESET <<  std::endl;
-		close(cli_fd);
 		deleteUser(cli_fd);
 	}
 	else if (ct == -1)
@@ -291,7 +297,6 @@ std::string	Server::receiveData(epoll_event event)
 		if (errno != EAGAIN) 
 		{
 			throw std::runtime_error("Error: ListeningLoop; recv err");
-			close(cli_fd);
 			deleteUser(cli_fd);
 		}
 	}
@@ -321,20 +326,45 @@ void	Server::setClientStatusId(std::stringstream &s, int fd)
 {
 	std::string user, nick;
 	std::string line;
-	std::getline(s, line, '\r');	
-	nick = line.substr(line.find(" ")+1, line.size() - 6);
-	
-	std::getline(s, line, '\r');	
-	std::stringstream b;	b << line;	std::getline(b, line, ':'); std::getline(b, line, '\r');
-	user = line;
-	
-	clients[getClientIdFromFd(fd)].setLogged();
-	clients[getClientIdFromFd(fd)].setIdentity(nick, user);	
+	std::getline(s, line, '\r');
+	if (line.find("\nNICK", 0))
+		nick = line.substr(line.find(" ")+1, line.size());
+// parsing suspicieux	
+	std::getline(s, line, '\r');
+	if (line.find("USER ", 0))
+	{
+		std::stringstream b;	b << line;	std::getline(b, line, ':'); std::getline(b, line, '\r');
+		user = line;
+	}
+	clients[getClientIdFromFd(fd)].setIdentity(nick, user, 2);
+}
+
+int	Server::clientPassword(std::stringstream &s, int fd)
+{
+	std::string line;
+	std::getline(s, line, '\n');
+	std::string fullstc("PASS " + passwd);
+
+	fullstc.append("\r");
+	if (fullstc == line)
+	{
+		std::cout << GREEN << "User n°" << fd << " well logged!" << YELLOW << "PASS passed\n" << RESET << std::endl;
+		setClientStatusId(s, fd);
+		clients[getClientIdFromFd(fd)].printClientInfo();
+	}
+	else 
+	{
+		std::cout << RED << "Error Password from client " << fd << RESET << std::endl;
+		// sendMessage(fd, "log error, please try again with another password");
+		return (-1);
+	}
+	return (1);	
 }
 
 int	Server::check_connection(std::string buffer, int fd)
-{	
-	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == 1)
+{
+	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == true 
+		|| ((clients[getClientIdFromFd(fd)].getNick() != DEFAULT_NICK) && (clients[getClientIdFromFd(fd)].getLoggedStatus() == false)))
 		return (0);
 	std::stringstream 	s;
 	std::string 		line;
@@ -342,75 +372,280 @@ int	Server::check_connection(std::string buffer, int fd)
 	std::getline(s, line, '\n');
 	if (line != "CAP LS \r\n")
 	{
-		sendNeutralMessage(fd, "CAP * LS :multi-prefix account-notify\r\n");		
-		std::cout << GREEN << "Client handshake: Sending CAP *  LS to client\n\n" << RESET << std::endl;
-	}
-	std::getline(s, line, '\n');
-	std::string fullstc("PASS " + passwd);
-	fullstc.append("\r");
-	if (fullstc == line)
-	{
-		std::cout << GREEN << "User n°" << fd << " well logged!" << RESET << std::endl;
-		setClientStatusId(s, fd);
-		std::cout << YELLOW << "User:\n" << RESET << clients[getClientIdFromFd(fd)].getUser() << YELLOW << "\nNick:\n" << RESET << clients[getClientIdFromFd(fd)].getNick()
-		<< YELLOW << "\nIp:\n" << RESET << clients[getClientIdFromFd(fd)].getIp() << std::endl;
-	}
-	else 
-	{
-		std::cout << RED << "Error Password from client " << fd << RESET << std::endl;
-		sendMessage(fd, "log error, please retry with another password");
-		return (-1);
+		sendNeutralMessage(fd, "CAP * LS :multi-prefix account-notify\r\n");
+		std::cout << GREEN << "Client handshake: Sending CAP * LS to client\n" << RESET << std::endl;
+		if (!clientPassword(s, fd))
+			return (-1);
+		// for (long unsigned int x = 0; x < clients.size(); x++) // TEMPORARY REMOVE FOR TESTING
+		// {
+		// 	if ((clients.at(x).getIp() == clients.at(getClientIdFromFd(fd)).getIp()) && (clients.size() > 1 && static_cast<int>(x) != getClientIdFromFd(fd)))
+		// 	{
+		// 		sendNeutralMessage(fd, "Already logged somewhere else");
+		// 		deleteUser(clients.at(getClientIdFromFd(fd)).getFd());
+		// 		return (-1);
+		// 	}
+		// }
 	}
 	return (0);
 }
-
-
-// int	Server::check_connection(std::string buffer, int fd)
-// {
-// 	// static int is_ok = 3;
-// 	// int size = std::strlen("PASS") + passwd.size();
-	
-// 	std::string fullstc("PASS " + passwd);
-// 	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == 1)
-// 		return (0);
-// 	if (buffer.find("CAP LS \r\n"))
-// 	{
-// 		sendNeutralMessage(fd, "CAP * LS :multi-prefix account-notify\r\n");
-// 		std::cout << GREEN << "Sending CAP *  LS to client" << RESET << std::endl;
-// 	}
-// 	buffer.replace(buffer.end()-2, buffer.end(), "\0");
-	
-// 	std::string aaa = buffer.substr(buffer.find("\r\n")+2, fullstc.size());
-// 	std::cout << "client pwd :" << aaa << std::endl;
-// 	if (aaa.compare(fullstc) == 0)
-// 	{
-// 		std::cout << GREEN << "User n°" << fd << " well logged!" << RESET << std::endl;
-// 		sendMessage(fd, "good password: Connection accepted\n");
-// 		clients[getClientIdFromFd(fd)].setLogged();
-// 		aaa = buffer.substr(buffer.find("\r\n")+2, (buffer.find("\r\n")+2) - aaa.size());
-// 		std::cout << "username nick and rest=" << aaa << " \n" << buffer << std::endl;
-// 		// std::stringstream s;
-		
-// 		// clients[getClientIdFromFd(fd)].setIdentity()
-// 	}
-// 	else 
-// 	{
-// 		std::cout << RED << "Error Password from client " << fd << RESET << std::endl;
-// 		sendMessage(fd, "log error, please retry with another password");
-// 		return (-1);
-// 	}
-// 	return (0);
-// }
-
 
 int Server::checkClientStatus(int fd, std::string buffer)
 {
 	int id = getClientIdFromFd(fd);
 	if (id > static_cast<int>(clients.size()) || id < 0)
 		return (-1);
-	if ((clients[id].getLoggedStatus() == 0) && (check_connection(buffer, fd) == -1))
+	
+	if ((clients[id].getLoggedStatus() == false) && (check_connection(buffer, fd) == -1))
 		return (-1);
 	return (0);
+}
+
+void	Server::capRequests(int fd, std::string buffer)
+{
+	std::cout << YELLOW << "Into cap requests" << RESET << std::endl;
+	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == true && buffer.find("CAP ") != std::string::npos)
+	{
+		std::cout << RED << "CAP TEST ALREADY PASSED DONT TRY TO BAIT THE SERVER\n" << RESET << std::endl;
+		return ;
+	}
+	if (buffer == "CAP REQ :multi-prefix\r\n" && clients[getClientIdFromFd(fd)].getNick() != DEFAULT_NICK)
+	{
+		std::string aaaa = clients[getClientIdFromFd(fd)].getNick();
+		std::string c("CAP " + aaaa);
+		c.append(" ACK :multi-prefix\r\n");
+		sendNeutralMessage(fd, c);
+		// sendNeutralMessage(fd, "CAP * ACK :multi-prefix\r\n");
+		std::cout << GREEN << "Client handshake: Sending CAP * ACK to client\n" << RESET << std::endl;
+	}
+	else if (buffer == "CAP END\r\n")
+	{
+		std::string c("001 " + clients[getClientIdFromFd(fd)].getNick());
+		c.append(" :Bienvenue . . . .\r\n");
+		sendNeutralMessage(fd, c);
+		clients[getClientIdFromFd(fd)].setLogged();
+		std::cout << GREEN << "Client " << clients[getClientIdFromFd(fd)].getNick() << " logged, CAP PASSED\n" << "stat log: " << clients[getClientIdFromFd(fd)].getLoggedStatus() << std::endl;
+	}
+	// else if (buffer.find(" LS\r\n") != std::string::npos)
+	// {
+	// 	std::stringstream tmp(buffer);
+	// 	std::string aaa;
+	// 	std::string bbb;
+	// 	tmp >> bbb;
+	// 	tmp >> aaa;
+	// 	aaa.append("doesn't exist\r\n");
+	// 	sendNeutralMessage(fd, "CAP command:" + aaa);
+	// }
+}
+
+int		Server::nickCommand(Client &cli, std::string buffer)
+{
+	std::string line = buffer.substr(5);
+	std::cout << "id|" << line << "|" << line.compare(" ") << " " << line.size() << std::endl;
+	if (buffer.compare("NICK \r\n") == 0)
+	{
+		sendNeutralMessage(cli.getFd(), "Erroneous nickname: empty\r\n");
+		return (-1);
+	}
+	if (line.size() <= 3 || (buffer.compare(0, 7, "NICK \r\n") == 0))
+	{
+		sendNeutralMessage(cli.getFd(), "Erroneous nickname\r\n"); // check spaces etc... (parser pr tt carrément)
+		return (-1);
+	}
+	line.resize(line.size() - 2);
+	std::string rps = "NICK :" + line + "\r\n";
+	sendMessage(cli.getFd(), rps);
+	cli.setIdentity(line, "", 1);
+	cli.printClientInfo();
+	return (0);
+}
+
+void	Server::pongUserListRoutine(Client &cli)
+{
+	std::cout << BOLDMAGENTA << "Currently logged:\n" << RESET << std::endl;
+	for (long unsigned int x = 0; x < clients.size(); x++)
+	{
+		std::cout << "stat: " << clients[x].getLoggedStatus() << std::endl;
+		if (clients[x].getFd() == cli.getFd())
+		{
+			std::cout << BOLDYELLOW << "Ping transnmitter: ";
+			clients[x].printClientInfo();
+			continue ;
+		}
+		if (clients[x].getLoggedStatus() != true)
+		{
+			std::cout << RED << "Login required: ";
+			clients[x].printClientInfo();
+		}
+		else
+			clients[x].printClientInfo();
+	}
+}
+
+void	Server::pongChannelsListRoutine()
+{
+	for (long unsigned int x = 0; x < channels.size(); x++)
+	{
+		std::cout << GREEN << "#"<< channels[x].getName() << " with " << channels[x].getSize() << " users connected"<< RESET << std::endl;
+		std::cout << "Topic:\t" << channels[x].getTopic() << std::endl;
+	}
+}
+
+void	Server::pongCommand(Client &cli, std::string buffer)
+{
+	std::cout << "parsing ping ..." << std::endl;
+	std::string bf = "PONG ";
+	bf.append(buffer.substr(5));
+	sendNeutralMessage(cli.getFd(), bf);
+	std::cout << GREEN << "PONG response sent to " << cli.getNick() << " at " << cli.getIp() << RESET << std::endl;
+	pongUserListRoutine(cli);
+	pongChannelsListRoutine();
+}
+
+void	Server::sendJoinInfo(Client &cli, std::string channel, int i)
+{
+	sendMessage(cli.getFd(), "JOIN :#" + channel + "\r\n");
+	sendNeutralMessage(cli.getFd(), "324 " + cli.getNick() + " #" + channel + " " + "+nt\r\n");
+	sendNeutralMessage(cli.getFd(), "332 " + cli.getNick() + " #" + channel + " :" + channels[i].getTopic() + "\r\n");
+	std::string str = "353 " + cli.getNick() + " = #" + channel + " :";
+	for (long unsigned int x = 0; x < clients.size();  x++)
+	{
+		if (channels[i].isUserPresent(clients[x].getNick()) >= 0)
+		{
+			if (channels[i].isOperator(clients[x].getNick()) == true)
+			{
+				str.append("@");
+				str.append(clients[x].getNick());
+				str.append(" ");
+			}
+		}
+	}
+	if (str[str.size()-1] == ' ')
+		str.insert(str.size()-1, "\r\n");
+	sendNeutralMessage(cli.getFd(), str);
+}
+
+void	Server::joinCommand(Client &cli , std::string channel)
+{
+	long unsigned int i = 0;	
+
+	while (i < channels.size())
+	{
+		if (channel == channels[i].getName())
+		{
+			if (channels[i].addUser(cli.getNick()) == 1)
+			{
+				sendJoinInfo(cli, channel, i);
+				// sendMessage(cli.getFd(), "JOIN :#" + channel + "\r\n");
+				// sendNeutralMessage(cli.getFd(), "324 " + cli.getNick() + " #" + channel + " " + "+nt\r\n");
+				// sendNeutralMessage(cli.getFd(), "332 " + cli.getNick() + " #" + channel + " :" + channels[i].getTopic() + "\r\n");
+				// std::string str = "353 " + cli.getNick() + " = #" + channel + " :";
+				// for (long unsigned int x = 0; x < clients.size();  x++)
+				// {
+				// 	if (channels[i].isUserPresent(clients[x].getNick()) >= 0)
+				// 	{
+				// 		if (channels[i].isOperator(clients[x].getNick()) == true)
+				// 			str.append("@");
+				// 		str.append(clients[x].getNick());
+				// 		str.append(" ");
+				// 	}
+				// }
+				// if (str[str.size()-1] == ' ')
+				// 	str.insert(str.size()-1, "\r\n");
+				// sendNeutralMessage(cli.getFd(), str);
+				return ;
+			}
+			else
+			{
+				// send message to client to inform that name already exists
+				std::cout << "Username already present in channel" << std::endl;
+				return ;
+			}
+		}
+		if (channels[i].getSize() == 0)
+		{
+			channels.erase(channels.begin() + i);
+			std::cout << "channel erased" << std::endl;
+		}
+		i++;
+	}
+	if (i == channels.size())
+	{
+		channels.push_back(Channel(channel, cli, "", 0, 1, 0, 0, "", 0));
+		sendJoinInfo(cli, channel, i);
+		return ;
+	}
+}
+
+void	Server::topicCommand(Client &cli, std::string channel)
+{
+	std::cout << "TOPIC" << channel << std::endl;
+	std::string aaa;
+	aaa = channel.substr(1, channel.find(" ")-1);
+	for (long unsigned int i = 0; i < channels.size(); i++)
+	{
+		std::cout << "TROPIC" << " " << channel << " " << aaa << " " << channels[i].getName() << std::endl;
+		if (channels[i].getName() == aaa && (channels[i].isOperator(cli.getNick()) == true && channels[i].isOpOnly())) // op protextion
+		{
+			std::string s = channel.substr(channel.find(" :")+2);
+			std::cout << "TROPICO " << s << std::endl;
+			s.append("\r\n");
+			channels[i].setTopic(s);
+			// std::string reply = "332 " + cli.getNick();
+			// reply.append(i.base()->getName()); reply.append(" :"); reply.append(s);
+			std::string reply = "TOPIC #" + channels[i].getName() + " :" + s;
+			// sendMessage(cli.getFd(), reply);
+			for (long unsigned int x = 0; x < clients.size();  x++)
+			{
+				if (channels[i].isUserPresent(clients[x].getNick()) >= 0)
+					sendMessage(clients[x].getFd(), reply);
+			}
+		}
+	}
+
+}
+
+
+void	Server::processCommand(int fd, std::string buffer)
+{
+	std::cout << "parsing ..." << std::endl;
+	if (fd < 0)
+	{
+		std::cout << RED << "Fd error" << RESET << std::endl;
+		return ;
+	}
+	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == false)
+		return capRequests(fd, buffer);
+	else
+	{
+		std::string tmp = buffer.substr(6);
+		tmp.erase(tmp.size()-2);
+		std::cout << "parsing else ..." << std::endl;
+		if (buffer.compare(0, 5, "NICK ") == 0)
+		{
+			if (nickCommand(clients[getClientIdFromFd(fd)], buffer) == 0)
+				std::cout << BOLDGREEN << "client NICK changed " << RESET << std::endl;
+			else
+			{
+				std::string err = "433 " + clients[getClientIdFromFd(fd)].getNick();
+				err.append(tmp);
+				err.append(" :Nickname is already in use\r\n");
+				sendNeutralMessage(fd, err);
+				return ;
+			}
+		}
+		else if ((buffer.compare(0, 5, "PING ")) == 0)
+			pongCommand(clients[getClientIdFromFd(fd)], buffer);
+		else if ((buffer.compare(0, 6, "JOIN #")) == 0)
+			joinCommand(clients[getClientIdFromFd(fd)] ,tmp);
+		else if ((buffer.compare(0, 7, "TOPIC #")) == 0)
+		{
+			std::string tp;
+			tp = buffer.substr(buffer.find("#"));
+			tp.erase(tp.size()-2);
+			topicCommand(clients[getClientIdFromFd(fd)], tp);
+		}
+	}
+
 }
 
 void	Server::ListeningLoop()
@@ -428,27 +663,24 @@ void	Server::ListeningLoop()
 		int ct_ev = epoll_wait(epollFd, event, maxEv, -1);
 		if (ct_ev == -1)
 		{
-			std::cerr << "epoll_wait . . . ." << std::endl;
+			std::cerr << "epoll_wait end . . . ." << std::endl;
 			break;
 		}
 		for (int x = 0; x < ct_ev; x++)
-		{		
+		{
 			if (event[x].data.fd == SocketFd)
 				AddNewClient(event[x]);
 			else
 			{
 				std::string buffer;
 				buffer = receiveData(event[x]);
-				
 				if (checkClientStatus(event[x].data.fd, buffer) == -1)
 				{
-					std::cout << "Client " << event[x].data.fd << " disconnected" << std::endl;
-					close(event[x].data.fd);
 					deleteUser(event[x].data.fd);
 					break;
 				}
-				// forwardData(event[x], buffer);
-				// std::cout << GREEN << "Event Received: " << buffer << RESET << std::endl;
+				else
+					processCommand(event[x].data.fd, buffer);
 			}
 		}
 	}

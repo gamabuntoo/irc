@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 23:18:38 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 05:02:25 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -158,41 +158,41 @@ std::string		Server::getIpFromFd(int cli_fd)
 		// 	// st =  "";
 		// } // closing remaining clients sockets
 
-void	Server::forwardData(epoll_event event, std::string buffer)
-{
-	std::string buff;
-	int cli_fd = event.data.fd;
+// void	Server::forwardData(epoll_event event, std::string buffer)
+// {
+// 	std::string buff;
+// 	int cli_fd = event.data.fd;
 
-	for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
-	{
-		std::cout << "size = " << this->clients.size() << " index= " << x << std::endl;
-		if (cli_fd != clients.at(x).getFd())
-		{
-			// sendMessage(cli_fd, buffer);
-			// sendMessage(cli_fd, "\n");
-			std::string st;
-			st.append("from server: ");
-			st.append("from ip: ");
-			st.append(getIpFromFd(clients.at(x).getFd()));
-			st.append(" : "); st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
-			// std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
-			size_t s = send(clients.at(x).getFd(), st.c_str(), sizeof(char) * st.size(), MSG_NOSIGNAL); // echo back text
-			// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
-			if (s == 0)
-			{
-				if (errno == EAGAIN || errno == EWOULDBLOCK)
-					break;
-				else
-				{
-					close(clients.at(x).getFd());
-					// close(cli_fd);
-					return ;
-				}
-			}
-		}
-		// st =  "";
-	}
-}
+// 	for (long unsigned int x = 0; x < this->clients.size(); x++) // echo to everyone connected
+// 	{
+// 		std::cout << "size = " << this->clients.size() << " index= " << x << std::endl;
+// 		if (cli_fd != clients.at(x).getFd())
+// 		{
+// 			// sendMessage(cli_fd, buffer);
+// 			// sendMessage(cli_fd, "\n");
+// 			std::string st;
+// 			st.append("from server: ");
+// 			st.append("from ip: ");
+// 			st.append(getIpFromFd(clients.at(x).getFd()));
+// 			st.append(" : "); st.append(buffer); // COUILLE COTE SERVEUR SUR LA STRING
+// 			// std::cout<<"sent to client:\n" << RED << st << "\n" << RESET << std::endl;
+// 			size_t s = send(clients.at(x).getFd(), st.c_str(), sizeof(char) * st.size(), MSG_NOSIGNAL); // echo back text
+// 			// size_t s = send(clients.at(x).getFd(), bf, std::strlen(bf), MSG_NOSIGNAL | MSG_DONTWAIT); // dont wait pas sur
+// 			if (s == 0)
+// 			{
+// 				if (errno == EAGAIN || errno == EWOULDBLOCK)
+// 					break;
+// 				else
+// 				{
+// 					close(clients.at(x).getFd());
+// 					// close(cli_fd);
+// 					return ;
+// 				}
+// 			}
+// 		}
+// 		// st =  "";
+// 	}
+// }
 
 std::string Server::getClientFormattedName(Client &cli)
 {
@@ -285,9 +285,10 @@ void	Server::deleteUser(int cli_fd)
 			for (long unsigned int g = 0; g < channels.size(); g++)
 			{
 				if (channels[g].isUserPresent(clients[x].getNick()) >= 0)
-					channels[g].removeUser(clients[x].getNick());
-				if (channels[g].getSize() == 0)
-					channels.erase(channels.begin() + g);
+					partCommand(clients[x], channels[g].getName(), "Disconnected");
+					// channels[g].removeUser(clients[x].getNick());
+				// if (channels[g].getSize() == 0)
+					// channels.erase(channels.begin() + g);
 			}
 			close(cli_fd);
 			std::cout << RED << "Client: " << std::endl; 
@@ -377,36 +378,38 @@ int	Server::clientPassword(std::stringstream &s, int fd)
 	std::string fullstc("PASS " + passwd);
 
 	fullstc.append("\r");
+	std::cout << "into client password :" << line << std::endl;
 	if (fullstc == line)
 	{
 		std::cout << GREEN << "User n°" << fd << " well logged!" << YELLOW << "PASS passed\n" << RESET << std::endl;
 		setClientStatusId(s, fd);
 		clients[getClientIdFromFd(fd)].printClientInfo();
+		return (1);
 	}
-	else 
+	else if (line.find("PASS ") != std::string::npos)
 	{
-		std::cout << RED << "Error Password from client " << fd << RESET << std::endl;
+		std::cout << RED << "Error Password from client " << fd << " :" << line << " for :" << fullstc << RESET << std::endl;
 		// sendMessage(fd, "log error, please try again with another password");
 		return (-1);
 	}
-	return (1);	
+	return (0);
 }
 
 int	Server::check_connection(std::string buffer, int fd)
 {
 	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == true 
-		|| ((clients[getClientIdFromFd(fd)].getNick() != DEFAULT_NICK) && (clients[getClientIdFromFd(fd)].getLoggedStatus() == false)))
+		&& ((clients[getClientIdFromFd(fd)].getNick() != DEFAULT_NICK)))
 		return (0);
 	std::stringstream 	s;
 	std::string 		line;
 	s << buffer;
-	std::getline(s, line, '\n');
-	if (line != "CAP LS \r\n")
+	// std::getline(s, line, '\r');
+	if (buffer.find("CAP LS 302\r\n") != std::string::npos)
 	{
 		sendNeutralMessage(fd, "CAP * LS :multi-prefix account-notify\r\n");
 		std::cout << GREEN << "Client handshake: Sending CAP * LS to client\n" << RESET << std::endl;
-		if (!clientPassword(s, fd))
-			return (-1);
+		// if (!clientPassword(s, fd))
+			// return (-1);
 		// for (long unsigned int x = 0; x < clients.size(); x++) // TEMPORARY REMOVE FOR TESTING
 		// {
 		// 	if ((clients.at(x).getIp() == clients.at(getClientIdFromFd(fd)).getIp()) && (clients.size() > 1 && static_cast<int>(x) != getClientIdFromFd(fd)))
@@ -416,7 +419,10 @@ int	Server::check_connection(std::string buffer, int fd)
 		// 		return (-1);
 		// 	}
 		// }
+		return (0);
 	}
+	if (clientPassword(s, fd) == -1)
+		return (-1);
 	return (0);
 }
 
@@ -426,7 +432,7 @@ int Server::checkClientStatus(int fd, std::string buffer)
 	if (id > static_cast<int>(clients.size()) || id < 0)
 		return (-1);
 	
-	if ((clients[id].getLoggedStatus() == false) && (check_connection(buffer, fd) == -1))
+	if ((clients[id].getLoggedStatus() == false) && (check_connection(buffer, fd) == -1) && buffer.find("CAP ") == std::string::npos)
 		return (-1);
 	return (0);
 }
@@ -439,7 +445,7 @@ void	Server::capRequests(int fd, std::string buffer)
 		std::cout << RED << "CAP TEST ALREADY PASSED DONT TRY TO BAIT THE SERVER\n" << RESET << std::endl;
 		return ;
 	}
-	if (buffer == "CAP REQ :multi-prefix\r\n" && clients[getClientIdFromFd(fd)].getNick() != DEFAULT_NICK)
+	if (buffer.find("CAP REQ :multi-prefix ") != std::string::npos)
 	{
 		std::string aaaa = clients[getClientIdFromFd(fd)].getNick();
 		std::string c("CAP " + aaaa);
@@ -450,11 +456,16 @@ void	Server::capRequests(int fd, std::string buffer)
 	}
 	else if (buffer == "CAP END\r\n")
 	{
-		std::string c("001 " + clients[getClientIdFromFd(fd)].getNick());
+		std::string c = "001 *";
 		c.append(" :Bienvenue . . . .\r\n");
 		sendNeutralMessage(fd, c);
 		clients[getClientIdFromFd(fd)].setLogged();
 		std::cout << GREEN << "Client " << clients[getClientIdFromFd(fd)].getNick() << " logged, CAP PASSED\n" << "stat log: " << clients[getClientIdFromFd(fd)].getLoggedStatus() << std::endl;
+	}
+	else if (buffer.find("PASS ") != std::string::npos)
+	{
+		if (check_connection(buffer, fd) == -1)
+			clients[getClientIdFromFd(fd)].setIdentity(DEFAULT_NICK, DEFAULT_USER, 2);
 	}
 	// else if (buffer.find(" LS\r\n") != std::string::npos)
 	// {
@@ -638,6 +649,52 @@ void	Server::privmsgCommand(Client &cli, std::list<std::string> l)
 	}
 }
 
+int		Server::getChannelIdFromName(std::string ch_name) // returns index of channel or minus 1 if error
+{
+	long unsigned int x = 0;
+	for (; x < channels.size(); x++)
+	{
+		if (channels[x].getName() == ch_name)
+			return (x);
+	}
+	if (x == 0)
+		std::cout << RED << "Error Server::getChannelIdFromName " << ch_name << " doesn't exists" << RESET << std::endl;
+	return (-1);
+}
+
+void	Server::partCommand(Client &cli, std::string channel, std::string reason)
+{
+	int x = getChannelIdFromName(channel);
+
+	int m = -1;
+	if (x < 0)
+		return ; // erreur getchannelidfromname
+	if (channels[x].isUserPresent(cli.getNick()) >= 0)
+	{
+		for (long unsigned int y = 0; y < channels[x].getSize();)
+		{
+			for (unsigned long o = 0; o < clients.size(); o++)
+			{
+				if (channels[x].isUserPresent(clients[o].getNick()) >= 0)
+				{
+					if (channels[x].getSize() == 2 && clients[o].getFd() != cli.getFd())
+						m = o;
+					sendMessage(clients[o].getFd(), "PART #" + channel + " :" + reason + "\r\n" , getClientFormattedName(cli));
+					y++;
+				}
+			}
+		}
+		channels[x].removeUser(cli.getNick());
+		if (channels[x].getSize() == 1)
+		{
+			channels[x].addChanOperator(clients[m].getNick());
+			sendNeutralMessage(clients[m].getFd(), "MODE #" + channel + " +o " + clients[m].getNick() + "\r\n");
+		}
+		if (channels[x].getSize() == 0)
+			channels.erase(channels.begin() + x);
+	}
+}
+
 void	Server::processCommand(int fd, std::string buffer)
 {
 	std::cout << "parsing ..." << std::endl;
@@ -646,7 +703,7 @@ void	Server::processCommand(int fd, std::string buffer)
 		std::cout << RED << "Fd error" << RESET << std::endl;
 		return ;
 	}
-	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == false)
+	if (clients[getClientIdFromFd(fd)].getLoggedStatus() == false || clients[getClientIdFromFd(fd)].getNick() == DEFAULT_NICK)
 		return capRequests(fd, buffer);
 	else
 	{
@@ -658,13 +715,7 @@ void	Server::processCommand(int fd, std::string buffer)
 			if (nickCommand(clients[getClientIdFromFd(fd)], buffer) == 0)
 				std::cout << BOLDGREEN << "client NICK changed " << RESET << std::endl;
 			else
-			{
-				std::string err = "433 " + clients[getClientIdFromFd(fd)].getNick();
-				err.append(tmp);
-				err.append(" :Nickname is already in use\r\n");
-				sendNeutralMessage(fd, err);
-				return ;
-			}
+				return sendNeutralMessage(fd, "433 " + clients[getClientIdFromFd(fd)].getNick() + tmp + " :Nickname is already in use\r\n");
 		}
 		else if ((buffer.compare(0, 5, "PING ")) == 0)
 			pongCommand(clients[getClientIdFromFd(fd)], buffer);
@@ -695,11 +746,29 @@ void	Server::processCommand(int fd, std::string buffer)
 		else if (buffer.compare(0, 6, "PART #") == 0)
 		{
 			std::cout << " part parsing "<< tmp << std::endl;
-			std::string chan = tmp.substr(0, tmp.find(" :")-1);
-			std::string rs = tmp.substr(chan.size());
+			std::string chan;
+			std::string rs = "";
+			if (tmp.find(" :") == std::string::npos)
+				chan = tmp;
+			else if (tmp.find(" :") != std::string::npos)
+			{
+				chan = tmp.substr(0, tmp.find(" :"));
+				rs = tmp.substr(chan.size() + 2);
+			}
+			// std::string chan = tmp.substr(tmp.find("#"), 6);
+			// chan.resize(chan.size()-2);
 			std::cout << "part parsing "<< chan << " " << rs << std::endl;
 			// PARSING:			Part command parsing error
-			// partCommand(tmp);
+			partCommand(clients[getClientIdFromFd(fd)], chan, rs);
+		}
+		else if (buffer.compare(0, 6, "WHOIS ") == 0)
+		{
+			sendNeutralMessage(fd, "311 " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getUser() 
+			+ " " + clients[getClientIdFromFd(fd)].getIp() + " " + getClientFormattedName(clients[getClientIdFromFd(fd)]) + " :" + clients[getClientIdFromFd(fd)].getNick() + "\r\n");
+			sendNeutralMessage(fd, "312 " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + SERVER_NAME + 
+			+ " :" + SHREX + "\r\n");
+			sendNeutralMessage(fd, "318 " +  clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + SERVER_NAME + 
+			+ " :END of /WHOIS list" + "\r\n");
 		}
 	}
 }

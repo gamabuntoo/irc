@@ -21,3 +21,4 @@ les // contiennent la sécurité pour pas avoir 2x le meme user log
 NAMES #channel
 :server 353 nick = #channel :@operator +voice user1 user2
 :server 366 nick #channel :End of /NAMES list
+

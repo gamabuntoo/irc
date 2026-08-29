@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 20:12:47 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 04:50:38 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,7 +54,7 @@
 #define MAX_EVENT		10
 #define IP_ADDR			"127.0.0.1"
 #define DEFAULT_USER	"3pmra5r8\"/\"-qr^$afùqldmw,roz0°3=rpa"
-#define DEFAULT_NICK	"/rp3\rarqlpzm08qa\"5$^3=\"aù-frdmow°,"
+#define DEFAULT_NICK	"/rp3arqlpzm08qa\"5$^3=\"aù-frdmow°,"
 #define SERVER_NAME		"serveur.irc.cool"
 
 
@@ -64,6 +64,9 @@
 #define USER_LIMIT		68
 #define EMPTY_CHAN_PASSW ""
 
+
+
+#define SHREX "\n⣿⣿⣿⠋⢩⢹⣿⣿⣿⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿\n⣿⣿⡧⣦⠄⢧⡙⢿⣟⢁⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿\n⣿⣿⣷⣶⣶⣦⡈⠂⠄⠸⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠉⠰\n⣿⣿⣿⣿⣿⣿⣿⠄⠄⠄⢒⣂⠄⠙⢿⣿⣿⡿⠛⢛⣻⣿⣿⡟⢁⣠⣴\n⣿⣿⣿⣿⣿⣿⠇⢇⡄⣆⣤⣀⣦⡄⢈⣉⣛⣭⡀⠙⠭⡛⠿⣿⣻⣿⣿\n⣿⣿⣿⣿⣿⣿⠄⠄⣿⣿⣿⣿⣿⢃⣿⣿⣿⣿⣿⣶⣷⡾⣼⣿⠈⠉⠄\n⣿⣿⣿⣿⣿⡇⠄⠄⢿⣿⣿⣿⣥⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣄⠄⠄\n⣿⣿⣿⡿⠋⠄⠄⠄⢸⣿⡿⠿⠄⠈⠛⢟⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⠄\n⣿⣿⠟⠁⠄⠄⠄⠄⠄⢠⣄⣀⡲⢦⣤⣼⣿⡿⣿⣿⣿⣿⣿⣿⣿⣿⡀\n⠋⠄⠄⠄⠄⠄⠄⠄⠄⠈⢿⣟⠻⠿⣿⣿⣿⣷⣾⣿⣿⣿⣿⢿⣿⣿⡇\n⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠻⣷⣶⣾⣿⣿⣿⣿⣿⣿⠟⢡⣿⣿⣿⡟\n⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣉⣹⣿⣿⣿⣿⠟⠁⣰⣿⣿⣿⣿⡇\n⣧⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠉⠉⠙⠛⠉⠁⢀⣼⣿⣿⣿⣿⡟⠄"
 
 // class Parser
 // {
@@ -165,7 +168,7 @@ class Server
 		void			AddClientToStruct(struct sockaddr_in cli, int cli_fd);
 		std::string		receiveData(epoll_event event);
 		
-		void			forwardData(epoll_event event, std::string buffer);
+		// void			forwardData(epoll_event event, std::string buffer);
 		void			sendMessage(int fd, std::string buffer);
 		void			sendNeutralMessage(int fd, std::string buffer);
 		void			sendMessage(int fd, std::string buffer, std::string prefix);
@@ -179,19 +182,21 @@ class Server
 		void			sendJoinInfo(Client &cli, std::string channel, int i);
 		void			topicCommand(Client &cli, std::string channel);
 		void			privmsgCommand(Client &cli, std::list<std::string> l);
+		void			partCommand(Client &cli, std::string channel, std::string reason);
 		
 		int				check_connection(std::string buffer, int fd);
 		void			AddNewClient(epoll_event event);
 		int				clientPassword(std::stringstream &s, int fd);
-		std::string 	getClientFormattedName(Client &cli);
-
+		
 		void			setClientStatusId(std::stringstream &s, int fd);
 		int				checkClientStatus(int fd, std::string buffer);
 		void			capRequests(int fd, std::string buffer);
 		void			deleteUser(int cli_fd);
-
+		
 		int				getClientIdFromFd(int fd);
 		std::string		getIpFromFd(int cli_fd);
+		std::string 	getClientFormattedName(Client &cli);
+		int				getChannelIdFromName(std::string ch_name);
 
 		void			Clean_exit();
 

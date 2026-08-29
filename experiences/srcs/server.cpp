@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/29 05:02:25 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 18:50:00 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -546,6 +546,15 @@ void	Server::pongCommand(Client &cli, std::string buffer)
 
 void	Server::sendJoinInfo(Client &cli, std::string channel, int i)
 {
+
+	for (unsigned long o = 0; o < clients.size(); o++)
+	{
+		if (channels[i].isUserPresent(clients[o].getNick()) >= 0)
+		{
+			if (channels[i].getSize() > 0 && clients[o].getFd() != cli.getFd())
+				sendMessage(clients[o].getFd(), "JOIN :#" + channel + "\r\n", getClientFormattedName(cli));
+		}
+	}
 	sendMessage(cli.getFd(), "JOIN :#" + channel + "\r\n");
 	sendNeutralMessage(cli.getFd(), "324 " + cli.getNick() + " #" + channel + " " + "+nt\r\n");
 	sendNeutralMessage(cli.getFd(), "332 " + cli.getNick() + " #" + channel + " :" + channels[i].getTopic() + "\r\n");
@@ -575,7 +584,10 @@ void	Server::joinCommand(Client &cli , std::string channel)
 		if (channel == channels[i].getName())
 		{
 			if (channels[i].addUser(cli.getNick()) == 1)
+			{
+				// if (channels[i].size() != 1)
 				return sendJoinInfo(cli, channel, i);
+			}
 			else
 			{
 				// send message to client to inform that name already exists
@@ -583,16 +595,22 @@ void	Server::joinCommand(Client &cli , std::string channel)
 				return ;
 			}
 		}
-		if (channels[i].getSize() == 0)
-		{
-			channels.erase(channels.begin() + i);
-			std::cout << "channel erased" << std::endl;
-		}
+		// if (channels[i].getSize() == 0)
+		// {
+		// 	channels.erase(channels.begin() + i);
+		// 	std::cout << "channel erased" << std::endl;
+		// }
 		i++;
 	}
 	if (i == channels.size())
 	{
-		channels.push_back(Channel(channel, cli, "", 0, 1, 0, 0, "", 0));
+		std::string topic = "";
+		if (channel.find(" ") != std::string::npos)
+		{
+			topic = channel.substr(channel.find(" "), channel.size() - channel.find(" "));
+			std::cout << "topic of created channel: " << topic << std::endl;
+		}
+		channels.push_back(Channel(channel, cli, topic, 0, 1, 0, 0, "", 0));
 		sendJoinInfo(cli, channel, i);
 		return ;
 	}
@@ -683,9 +701,9 @@ void	Server::partCommand(Client &cli, std::string channel, std::string reason)
 					y++;
 				}
 			}
-		}
+		}				// crash par ici sous testing sauvage avec 7 terminaux sous irssi
 		channels[x].removeUser(cli.getNick());
-		if (channels[x].getSize() == 1)
+		if (channels[x].getSize() == 1 && m != -1)
 		{
 			channels[x].addChanOperator(clients[m].getNick());
 			sendNeutralMessage(clients[m].getFd(), "MODE #" + channel + " +o " + clients[m].getNick() + "\r\n");
@@ -766,7 +784,7 @@ void	Server::processCommand(int fd, std::string buffer)
 			sendNeutralMessage(fd, "311 " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getUser() 
 			+ " " + clients[getClientIdFromFd(fd)].getIp() + " " + getClientFormattedName(clients[getClientIdFromFd(fd)]) + " :" + clients[getClientIdFromFd(fd)].getNick() + "\r\n");
 			sendNeutralMessage(fd, "312 " + clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + SERVER_NAME + 
-			+ " :" + SHREX + "\r\n");
+			+ " :" + SKYYART + "\r\n");
 			sendNeutralMessage(fd, "318 " +  clients[getClientIdFromFd(fd)].getNick() + " " + clients[getClientIdFromFd(fd)].getNick() + " " + SERVER_NAME + 
 			+ " :END of /WHOIS list" + "\r\n");
 		}

@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/25 20:31:49 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/26 20:29:48 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 19:48:17 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -165,4 +165,9 @@ void	Channel::addChanOperator(std::string nick)
 		operators.push_back(nick);
 		std::cout << "User " << nick << " set as operator" << std::endl;
 	}
+}
+
+int	Channel::getOperatorSize()
+{
+	return (operators.size());
 }

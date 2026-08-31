@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:13 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/29 05:17:39 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 19:48:36 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -135,6 +135,7 @@ class Channel
 		bool		isOperator(std::string nick);
 		bool		isOpOnly();
 		void		addChanOperator(std::string nick);
+		int			getOperatorSize();
 };
 
 class Server

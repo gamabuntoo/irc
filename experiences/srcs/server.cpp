@@ -6,7 +6,7 @@
 /*   By: gule-bat <gule-bat@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/20 15:24:04 by gule-bat          #+#    #+#             */
-/*   Updated: 2026/08/29 18:50:00 by gule-bat         ###   ########.fr       */
+/*   Updated: 2026/08/29 20:16:24 by gule-bat         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -702,8 +702,14 @@ void	Server::partCommand(Client &cli, std::string channel, std::string reason)
 				}
 			}
 		}				// crash par ici sous testing sauvage avec 7 terminaux sous irssi
+		
 		channels[x].removeUser(cli.getNick());
-		if (channels[x].getSize() == 1 && m != -1)
+		// if (channels[x].isOperator(cli.getNick()) && channels[x].getOperatorSize() == 0)
+		// {
+		// 	if (channels[x].getSize() > 1)
+			
+		// }
+		if (channels[x].getSize() == 1 && m != -1 ) // admin rights should be transfered when size of channel > 2 ans getoperatorsize == 0
 		{
 			channels[x].addChanOperator(clients[m].getNick());
 			sendNeutralMessage(clients[m].getFd(), "MODE #" + channel + " +o " + clients[m].getNick() + "\r\n");
